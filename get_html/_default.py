@@ -1,6 +1,7 @@
 from enum import IntEnum
 
 import requests
+import urllib3
 
 #: Default user-agent if not overriden
 DEFAULT_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.89 Safari/537.36'
@@ -8,6 +9,9 @@ DEFAULT_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_3) AppleWebKi
 GET_TIMEOUT = 60
 #: Timeout used when rendering page using requests-html
 RENDER_TIMEOUT = 60
+
+# suppress warning for invalid SSL certificates
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class Modes(IntEnum):
