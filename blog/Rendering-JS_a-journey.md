@@ -1,16 +1,15 @@
 # Rendering JS: a journey
 
-This article is an account of my development process that took place on **February, 2020**.
+This article is an account of my development process that took place in **February 2020**.
 
 I first explain my first attempt (using a third-party library, requests-html) at fetching the raw HTML after JS rendering,
 the problems I struggled with and the incremental solutions I found.
 I then explain why I decided to make my own implementation instead, and how I solved the problem.
 
-
-**Disclaimer**: 
+**Disclaimer**:
 
 It started as a bunch of personal notes, but I figured it would be interesting for others.
-In any case do I argue that other libraries are "*bad*" or that reimplementing the wheel is always a good idea.
+I wouldn't in any way want to pretend that other libraries are "*bad*" or that reimplementing the wheel is always a good idea.
 This was really more of an exercise to me, so please keep an open (and critical) mind while reading.
 
 **Libraries used in this article**
@@ -45,12 +44,11 @@ This was really more of an exercise to me, so please keep an open (and critical)
   * [Still problems, pyppeteer2 to the rescue](#still-problems--pyppeteer2-to-the-rescue)
 - [Conclusion](#conclusion)
 
-
 # Context & motivations
 
 First, let me explain the context a bit. I am currently working on an automated crawler that targets Swiss German sentences. Without going into the details, the code base quite evolved over the months and I have from the beginning tried to make it very flexible: all the "tools" in my pipeline inherit from some interface and can be chosen/configured at runtime using a yaml file. This makes it great for the user, but a nightmare for the developer.
 
-Anyhow, the first step in crawling the web is to get the page content, that is the actual HTML from where I then extract the text. Currently, all my crawler implementations rely on [requests](https://requests.readthedocs.io/en/master/) to do this job. It is a great library which is a breeze to use. *However*, it only returns the HTML sent by the server, which is not always the same as the rendered HTML you would see in a browser. Indeed, websites this days more and more rely on AJAX calls and DOM manipulation to load text content. 
+Anyhow, the first step in crawling the web is to get the page content, that is the actual HTML from where I then extract the text. Currently, all my crawler implementations rely on [requests](https://requests.readthedocs.io/en/master/) to do this job. It is a great library which is a breeze to use. *However*, it only returns the HTML sent by the server, which is not always the same as the rendered HTML you would see in a browser. Indeed, websites these days rely more and more on AJAX calls and DOM manipulation to load text content.
 
 The best example being Twitter: as of November 2019, you could still grasp some tweets by using a `GET https://twitter.com/#some-hashtag`. But those days are gone. If you do this now, the only text you'll get will be:
 
@@ -62,7 +60,7 @@ So on modern websites, the only way to get the content of a page is to *actually
 
 # Rendering HTML using Python
 
-I have been aware of tools such as [selenium](https://www.selenium.dev/) or [puppeteer](https://github.com/puppeteer/puppeteer) (and its unofficial python port [pyppeteer](https://miyakogi.github.io/pyppeteer/reference.html)). However, they seemed kind of hard to work with, required a lot of setup and just had to steep a learning curve for me to even try. 
+I have been aware of tools such as [selenium](https://www.selenium.dev/) or [puppeteer](https://github.com/puppeteer/puppeteer) (and its unofficial python port [pyppeteer](https://miyakogi.github.io/pyppeteer/reference.html)). However, they seemed kind of hard to work with, required a lot of setup and the learning curve was just too steep for me to even try.
 
 And then, I found [request-html](https://github.com/psf/requests-html). From their README, rendering a page and getting the content seemed as easy as:
 
@@ -128,8 +126,6 @@ I implemented and tested the code, now let's see in "production". First, let's l
 > RuntimeError: There is no current event loop in thread 'Thread-Y'.\
 > ...
 
-
-
 ### First problem, asyncio loop from thread
 
 Not really familiar with the whole asyncio stuff, I google a bit and find an issue in requests-html exactly about that: 
@@ -184,7 +180,7 @@ Now, my next move is to actually run my crawler in "production" using my new pie
 
 ### Exception: Target.closed
 
-Googling this error, I find this exact [issue in pyppeteer's repo](https://github.com/miyakogi/pyppeteer/issues/234#issuecomment-518215288), posted in July, 2019: "*This [Target closed] error is escalated when multiple tasks are performed asynchronously，when there's only one URL in it, it's okay to scrapy.*" Another user reports, "*I am facing the same issue when i access 3 links one after other and always happens with the 3rd link irrespective of what url it is.*"  So, does it mean my efforts were in vain ? That pyppeteer, and thus requests-html, is unusable in a crawler environment ? 
+Googling this error, I find this exact [issue in pyppeteer's repo](https://github.com/miyakogi/pyppeteer/issues/234#issuecomment-518215288), posted in July, 2019: "*This [Target closed] error is escalated when multiple tasks are performed asynchronously，when there's only one URL in it, it's okay to scrapy.*" Another user reports, "*I am facing the same issue when i access 3 links one after other and always happens with the 3rd link irrespective of what url it is.*"  So, does it mean my efforts were in vain ? That pyppeteer, and thus requests-html, is unusable in a crawler environment ?
 
 Well, fortunately, the [last comment of the thread](https://github.com/miyakogi/pyppeteer/issues/234#issuecomment-518215288) gives me hope again. It seems the problem comes from websockets that are not handled correctly and make the browser misbehave. His solution: downgrading the websockets library to version 6:
 
@@ -201,14 +197,14 @@ try:
     # See https://github.com/miyakogi/pyppeteer/issues/234#issuecomment-518215288
     wv = websockets.__version__
     if not wv.strip().startswith('6'):
-        print(f'Wrong websockets version {wv}, should be v6.' 
+        print(f'Wrong websockets version {wv}, should be v6.'
                'Please run pip install websockets==6')
         exit(1)
 except ModuleNotFoundError:
     pass
 ```
 
-Launching again and ... 
+Launching again and ...
 
 Well, no error, but after crawling 12-15 URLs, the system hangs. Systematically. But there is no error of any kind, no clue. What is going on ? 
 
@@ -216,21 +212,21 @@ Well, no error, but after crawling 12-15 URLs, the system hangs. Systematically.
 
 My first intuition is that I screwed something with the lock and there is a deadlock. But the lock is systematically released in a `finally` close... Using `strace`, `gdb` and other tools, I can see that the program behaves properly: it is the requests-html `render()` method that is stuck.
 
-Google being my friend, I finally get my answer, again in [an issue from the pyppeteer repo](https://github.com/miyakogi/pyppeteer/issues/167). [MemoryAndDream explains](https://github.com/miyakogi/pyppeteer/issues/167#issuecomment-442389039): 
+Google being my friend, I finally get my answer, again in [an issue from the pyppeteer repo](https://github.com/miyakogi/pyppeteer/issues/167). [MemoryAndDream explains](https://github.com/miyakogi/pyppeteer/issues/167#issuecomment-442389039):
 
-> *I have find the problem. I need set `'dumpio': True` in `launch`,or `subprocess.Popen` chrome will be stuck if the stderr is too large!*" 
+> *I have find the problem. I need set `'dumpio': True` in `launch`,or `subprocess.Popen` chrome will be stuck if the stderr is too large!*"
 
-OK, so the problem is that some buffer gets filled, and Chrome is stuck waiting for something to consume its [crazy amount] of logs. 
+OK, so the problem is that some buffer gets filled, and Chrome is stuck waiting for something to consume its [crazy amount] of logs.
 
-There is no way to change this behavior from `requests-html`, except by altering the source code itself. At this point I am desperate, so I just add a note somewhere and edit `venv/lib/python3.7/site-packages/requests_html.py`, passing  `dumpio=True` to the `pyppeteer.launch` method.
+There is no way to change this behavior from `requests-html`, except by altering the source code itself. At this point I am desperate, so I just add a note somewhere and edit `venv/lib/python3.7/site-packages/requests_html.py`, passing `dumpio=True` to the `pyppeteer.launch` method.
 
-This works, but gosh this pyppeteer is verbose ! 
+This works, but gosh this pyppeteer is verbose !
 
 ## Waiting for AJAX to load
 
 By this point, I finally have something working. I let it run for a while and play some more with the code. One of my first motivations at rendering pages during crawling was to be able to scrape Twitter and the like. So I try twitter again, expecting to see some tweets this time. Instead, I get:
 
-```
+```text
 Something went wrong, but don’t fret — let’s give it another shot.
 ```
 
@@ -240,7 +236,7 @@ By now, I became familiar with `requests-html` and how they use `pyppeteer` behi
 await page.goto(url, options={'timeout': int(timeout * 1000)})
 ```
 
-Looking at the API documentation of pyppeteer's [` Page.goto` method](https://miyakogi.github.io/pyppeteer/reference.html#pyppeteer.page.Page.goto), I see there is an interesting option called `waitUntil`: 
+Looking at the API documentation of pyppeteer's [` Page.goto` method](https://miyakogi.github.io/pyppeteer/reference.html#pyppeteer.page.Page.goto), I see there is an interesting option called `waitUntil`:
 
 > `waitUntil` (str|List[str]): When to consider navigation succeeded, defaults to `load`. [...] Events can be either:
 >
@@ -249,7 +245,7 @@ Looking at the API documentation of pyppeteer's [` Page.goto` method](https://mi
 > - `networkidle0`: when there are no more than 0 network connections for at least 500 ms.
 > - `networkidle2`: when there are no more than 2 network connections for at least 500 ms.
 
-Hence, requests-html only waits for the `load` event, which lets virtually no time for the AJAX resources to be loaded, let alone injected into the DOM. In order to get the content of JS-heavy websites (e.g. Twitter), we need at least `networkidle2`. 
+Hence, requests-html only waits for the `load` event, which lets virtually no time for the AJAX resources to be loaded, let alone injected into the DOM. In order to get the content of JS-heavy websites (e.g. Twitter), we need at least `networkidle2`.
 
 There is no option in requests-html, so once again I edit the file inside my virtualenv:
 
@@ -258,7 +254,7 @@ There is no option in requests-html, so once again I edit the file inside my vir
 await page.goto(url, options={'timeout': int(timeout * 1000)}, waitUntil='networkidle0')
 ```
 
-With this change, I can now see tweets alright. 
+With this change, I can now see tweets alright.
 
 ## Make the environment reproducible
 
@@ -267,7 +263,7 @@ I finally have a working version that does what I need, but with a lot of compro
 * the crawler is now a bottleneck, with only one thread at a time making an HTTP request (`threading.lock`);
 * I have to manually change files in my environment for the system to work, which is suboptimal: I can easily forget it during a reinstall. Even explained in a README, chances are I (and others) will overlook it.
 
-To circumvent the latter, I could make pull requests (which [I did](https://github.com/psf/requests-html/pull/366), at least for the `waitUntil` shenanigan). However, pull requests may take time to be processed, be rejected, etc. 
+To circumvent the latter, I could make pull requests (which [I did](https://github.com/psf/requests-html/pull/366), at least for the `waitUntil` shenanigan). However, pull requests may take time to be processed, be rejected, etc.
 
 (As a side note, my pull request "*failed all tests*", and looking at the Travis build history, there is a bug in `.travis-ci.yaml` making *any* pull request fail at installing dependencies. It has been going on for more than 6 months, so I don't expect my changes to be accepted soon.)
 
@@ -275,9 +271,9 @@ Another way is to fork and simply use my version of requests-html, but it means 
 
 # Screw it start again from scratch
 
-After all these troubles, I am now familiar with the requests-html internals. I can see that I don't need most of what it offers, and the things I need the most (`dumpio=True`, waiting for `networkidle0`) are not covered. 
+After all these troubles, I am now familiar with the requests-html internals. I can see that I don't need most of what it offers, and the things I need the most (`dumpio=True`, waiting for `networkidle0`) are not covered.
 
-Moreover, one thing I dislike is the fact that to render a page, I need first to get the html using `requests`. Indeed, the implementation is such that with requests-html, to call render we first need a response, hence to call the  `requests.get` method once.
+Moreover, one thing I dislike is the fact that to render a page, I need first to get the html using `requests`. Indeed, the implementation is such that with requests-html, to call render we first need a response, hence to call the `requests.get` method once.
 So crawling one URL means firing at least two `GET`. This detail is what really convinced me to simply reimplement the part I need.
 
 ## JsRenderer
@@ -286,7 +282,7 @@ Basically, what I need to do to render JS is:
 
 1. launch a pyppeteer instance (i.e. a browser)
 2. create a new page (`browser.newPage`)
-3. load the URL in the page ( `page.goto`, which returns a response object with precious info), waiting for the network to cool down ( `networkidle0`)
+3. load the URL in the page (`page.goto`, which returns a response object with precious info), waiting for the network to cool down (`networkidle0`)
 4. get the page content
 5. return the response (headers, etc.) and the content in a way that is compatible with `requests`
 
@@ -333,17 +329,17 @@ To circumvent this, I surround my `page.goto` call in a try/except and as a last
 
 ### Fetch more than one tweet
 
-The default page viewport is quite small: 800x600. A height of 600px means that sites like twitter is only able to display one post and will wait for the scroll event to load more. 
+The default page viewport is quite small: 800x600. A height of 600px means that sites like twitter is only able to display one post and will wait for the scroll event to load more.
 This is why I automatically set the viewport to 1200x1000.
 
 ### Fallback
 
-In some instances the `page.goto` call returns `None` instead of throwing an exception (I posted an [issue](https://github.com/miyakogi/pyppeteer/issues/299) about it). It happens mostly when the content-encoding is wrong, e.g. says `gzip` but the actual content is not a valid gzip. 
-In those rare instances, `JsRenderer` will fallback to calling `requests`, which provides meaningful error messages. 
+In some instances the `page.goto` call returns `None` instead of throwing an exception (I posted an [issue](https://github.com/miyakogi/pyppeteer/issues/299) about it). It happens mostly when the content-encoding is wrong, e.g. says `gzip` but the actual content is not a valid gzip.
+In those rare instances, `JsRenderer` will fallback to calling `requests`, which provides meaningful error messages.
 
 ### Requests compatibility
 
-I want to be able to seamlessly switch between requests and JsRenderer. To make that possible, I construct a `requests.Response` for the information I gather from `pyppeteer`. 
+I want to be able to seamlessly switch between requests and JsRenderer. To make that possible, I construct a `requests.Response` for the information I gather from `pyppeteer`.
 Most `requests.Response` attributes are directly available from the pyppeteer response. Except:
 * `reason`: the reason is the status line, e.g. `OK` for 200. Most websites follow the convention (no status line or the one defined in the RFC), but it can always vary. Requests gets it from `urllib3`. With pyppeteer, I didn't find a way to get it. 
   To not leave it blank, I can: 
@@ -355,9 +351,9 @@ Most `requests.Response` attributes are directly available from the pyppeteer re
     
 ## Seamlessly choose the implementation from an environment variable
 
-As stated at the beginning of this post, due to how swisstext works, I wanted to control if rendering is used or not at launch without having to change the code of all my crawler implementations. 
+As stated at the beginning of this post, due to how swisstext works, I wanted to control if rendering is used or not at launch without having to change the code of all my crawler implementations.
 
-I already showed how I define a `do_get` method differently based on the value of an environment variable using requests-html. 
+I already showed how I define a `do_get` method differently based on the value of an environment variable using requests-html.
 Now that I have `JsRenderer` that supports threading, the code is altered in this way:
 
 ```python
@@ -403,26 +399,25 @@ else:
         resp = renderer.render(url, timeout=timeout)
 
         return resp
-``` 
+```
 
-Here, the secret is the use of a `defaultdict`, with the key being the thread name and the value an instance of `JsRenderer`. 
+Here, the secret is the use of a `defaultdict`, with the key being the thread name and the value an instance of `JsRenderer`.
 
 **If we want one browser only**, we create one renderer when the module is imported. The `__init__.py` method will thus be called from the main thread. This same instance is attached to all the thread names.
 
-**If we want one browser per thread**, we use `defaultdict(lambda: JsRenderer())` so that the first time a thread queries the dictionary, a new renderer instance will be created. 
+**If we want one browser per thread**, we use `defaultdict(lambda: JsRenderer())` so that the first time a thread queries the dictionary, a new renderer instance will be created.
 
 **If the chromium subprocess dies**... Well, in case the underlying browser is killed for some reason, a `pyppeteer.errors.Network` exception will be thrown in all subsequent calls.
-I can't avoid the first one, but when it happens I could check the subprocess 
+I can't avoid the first one, but when it happens I could check the subprocess
 (if `browser.subprocess.poll()` returns something other than `None`, it means it has exited)
-and close the browser, so it will be recreated on the next call to `render`. 
+and close the browser, so it will be recreated on the next call to `render`.
 
 #### IMPORTANT NOTICES 
 
 * With this implementation, the browsers are never properly closed. This is because they are created when the module imported, and apart from `atexit` there is no way of detecting when it goes "out of scope". So I actually rely on the fact that child processes will be killed when the main program terminates... (I know this is far from "clean" or "ideal"). For my needs, it is OK though.
-* Using one browser per thread is only pertinent if you have few threads that use the renderer thoughout their lifetime. 
+* Using one browser per thread is only pertinent if you have few threads that use the renderer thoughout their lifetime.
   Remember: *each* thread will have its own browser running. If you spawn 1,000 threads that all call `do_get` once, you'll
   have 1,000 chromium running in the background !
-
 
 ## Still problems, pyppeteer2 to the rescue
 
@@ -441,14 +436,12 @@ So it tried using `pyppeteer2` instead. It seems to work and fixes the websocket
 
 # Conclusion
 
-The work of a developer is mostly about generating codes, getting some exception, googling about it and apply the fix that will trigger the next error. 
+The work of a developer is mostly about generating codes, getting some exception, googling about it and apply the fix that will trigger the next error.
 This is both annoying and exhilarating, a sort of detective work that may not always end as expected.
 
-I know that this blogpost will be completely outdated in a few months (the libraries will have changed, as well as the underlying chromium), but I still enjoyed the journey. 
+I know that this blog post will be completely outdated in a few months (the libraries will have changed, as well as the underlying chromium), but I still enjoyed the journey.
 I hope it may be useful to some, fun to read for others.
 
 Happy coding,
 
 🐙 Derlin 🐙
-
- 
