@@ -17,12 +17,12 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 class Modes(IntEnum):
     """Available modes"""
     DEFAULT = 0
-    RENDER_JS_MONO = 1
-    RENDER_JS_MULTI = 2
+    RENDER_HTML_MONO = 1
+    RENDER_HTML_MULTI = 2
 
 
 #: Environment variable to switch between Modes
-ENV_VARIABLE = 'RENDER_JS'
+ENV_VARIABLE = 'RENDER_HTML'
 
 
 def default_get(url, headers=None, timeout=GET_TIMEOUT) -> requests.Response:

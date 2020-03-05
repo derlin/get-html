@@ -1,4 +1,4 @@
-from get_html.js_renderer import create_renderer
+from get_html.html_renderer import create_renderer
 
 
 def test_contextmanager():

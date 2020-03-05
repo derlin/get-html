@@ -35,7 +35,7 @@ class Worker(threading.Thread):
                 check.is_true(False, e)
 
 
-@pytest.mark.parametrize('mode', [Modes.RENDER_JS_MONO, Modes.RENDER_JS_MULTI])
+@pytest.mark.parametrize('mode', [Modes.RENDER_HTML_MONO, Modes.RENDER_HTML_MULTI])
 def test_threads(mode):
     with load_doget_module(mode) as hg:
         # create an run threads
@@ -46,4 +46,4 @@ def test_threads(mode):
         all_renderers = list(hg._RENDERER.values())
         assert len(all_renderers) == 2
         # ensure the renderers shared/not shared between threads depending on mode
-        assert (all_renderers[0] == all_renderers[1]) == (mode == Modes.RENDER_JS_MONO)
+        assert (all_renderers[0] == all_renderers[1]) == (mode == Modes.RENDER_HTML_MONO)

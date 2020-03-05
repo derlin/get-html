@@ -5,9 +5,9 @@ from importlib import reload
 
 
 @contextmanager
-def load_doget_module(render_js=0):
+def load_doget_module(render_html=0):
     import get_html.env_defined_get as hg
-    os.environ[ENV_VARIABLE] = str(int(render_js))
+    os.environ[ENV_VARIABLE] = str(int(render_html))
     hg = reload(hg)
     try:
         yield hg

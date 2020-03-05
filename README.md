@@ -1,7 +1,7 @@
 # get-html: get raw or rendered HTML (for humans)
 
 **<p align=center>Read all the details on how I implemented this at ⇝
-[Rendering-JS_a-journey](https://github.com/derlin/get-html/blob/master/blog/Rendering-JS_a-journey.md) ⇜ </p>**
+[Rendering-HTML_a-journey](https://github.com/derlin/get-html/blob/master/blog/Rendering-HTML_a-journey.md) ⇜ </p>**
 
 This module is made for anyone needing to scrape HTML (i.e. scrape the web).
 
@@ -14,18 +14,18 @@ Moreover, it is made such that you can use a unique method throughout your proje
 and switch between the two behaviors at launch by setting an environment variable.
 
 **<p align=center>Read all the details on how I implemented this at ⇝
-[Rendering-JS_a-journey](https://github.com/derlin/get-html/blob/master/blog/Rendering-JS_a-journey.md) ⇜ </p>**
+[Rendering-HTML_a-journey](https://github.com/derlin/get-html/blob/master/blog/Rendering-HTML_a-journey.md) ⇜ </p>**
 
-## JsRenderer: a class to seamlessy render a page
+## HtmlRenderer: a class to seamlessy render a page
 
-`JsRenderer` handles all the specific `pyppeteer` stuff for you. It is also thread-safe.
+`HtmlRenderer` handles all the specific `pyppeteer` stuff for you. It is also thread-safe.
 
 Here is a typical usage:
 
 ```python
-from get_html import JsRenderer
+from get_html import HtmlRenderer
 
-renderer = JsRenderer()
+renderer = HtmlRenderer()
 try:  
     # use the renderer. The underlying browser will be instantiated on first call to render.
     response = renderer.render(url='https://xkcd.com')
@@ -60,10 +60,10 @@ html_bytes = response.content
 html_string = response.text
 ```
 
-The actual behavior of `do_get` will depend on the environment variable `RENDER_JS`:
+The actual behavior of `do_get` will depend on the environment variable `RENDER_HTML`:
 
-* `RENDER_JS=[1|y|true|on]`: `do_get` will launch a chromium instance under the hood and render the page (rendered HTML)
-* `RENDER_JS=<anything BUT 2>` (default): `do_get` will forward the call to `requests.get` (raw HTML). 
+* `RENDER_HTML=[1|y|true|on]`: `do_get` will launch a chromium instance under the hood and render the page (rendered HTML)
+* `RENDER_HTML=<anything BUT 2>` (default): `do_get` will forward the call to `requests.get` (raw HTML). 
   Do **NOT** use `2` before reading through the multi-threading section.
 
 If rendering support is on, a browser instance will be launched **on module load**, and will be kept alive throughout the life of the application.
@@ -71,7 +71,7 @@ Keep that in mind if you have low-memory (chromium !!).
 
 ## Multi-threading
 
-`JsRenderer` is thread-safe.
+`HtmlRenderer` is thread-safe.
 
 For `do_get` with rendering support, there are two possibilities.
 
@@ -79,7 +79,7 @@ For `do_get` with rendering support, there are two possibilities.
 2. Create **one browser per thread**. In this case, threads can render in parallel. But be careful, each time a new thread calls `do_get`,
   *a new browser is launched*, that will keep running until the end of the program (or until you call `get_html.env_defined_get.close()`).
 
-Enable mode (2) by setting `RENDER_JS=2`. But again, ensure you don't have too many threads, since chromium needs a lot of memory.
+Enable mode (2) by setting `RENDER_HTML=2`. But again, ensure you don't have too many threads, since chromium needs a lot of memory.
 
 ## Running tests
 

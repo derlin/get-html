@@ -22,14 +22,14 @@ def create_renderer(*args, **kwargs):
     >>>     # use renderer
     >>>     resp = renderer.render('https://some-url.com')
     """
-    renderer = JsRenderer(*args, **kwargs)
+    renderer = HtmlRenderer(*args, **kwargs)
     try:
         yield renderer
     finally:
         renderer.close()
 
 
-class JsRenderer:
+class HtmlRenderer:
 
     def __init__(self, loop=None, headless=True, ignoreHTTPSErrors=True, browser_args=['--no-sandbox']):
         """

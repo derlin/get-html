@@ -1,8 +1,8 @@
-# Rendering JS: a journey
+# Rendering HTML: a journey
 
 This article is an account of my development process that took place in **February 2020**.
 
-I first explain my first attempt (using a third-party library, requests-html) at fetching the raw HTML after JS rendering,
+I first explain my first attempt (using a third-party library, requests-html) at fetching the HTML from an URL *after* JS rendering,
 the problems I struggled with and the incremental solutions I found.
 I then explain why I decided to make my own implementation instead, and how I solved the problem.
 
@@ -33,7 +33,7 @@ This was really more of an exercise to me, so please keep an open (and critical)
   * [Waiting for AJAX to load](#waiting-for-ajax-to-load)
   * [Make the environment reproducible](#make-the-environment-reproducible)
 - [Screw it start again from scratch](#screw-it-start-again-from-scratch)
-  * [JsRenderer](#jsrenderer)
+  * [HtmlRenderer](#jsrenderer)
     + [Threading](#threading)
     + [Wait for page load](#wait-for-page-load)
     + [Fetch more than one tweet](#fetch-more-than-one-tweet)
@@ -62,7 +62,9 @@ So on modern websites, the only way to get the content of a page is to *actually
 
 I have been aware of tools such as [selenium](https://www.selenium.dev/) or [puppeteer](https://github.com/puppeteer/puppeteer) (and its unofficial python port [pyppeteer](https://miyakogi.github.io/pyppeteer/reference.html)). However, they seemed kind of hard to work with, required a lot of setup and the learning curve was just too steep for me to even try.
 
-And then, I found [request-html](https://github.com/psf/requests-html). From their README, rendering a page and getting the content seemed as easy as:
+And then, I found [request-html](https://github.com/psf/requests-html), a library based on pyppeteer, 
+which is supposed to do all the heavy-lifting for us.
+From their README, rendering a page and getting the content seemed as easy as:
 
 ```python
 from requests_html import HTMLSession
@@ -91,7 +93,7 @@ import os
 
 __all__ = ['do_get']
 
-if os.getenv('RENDER_JS', '0').lower().strip() in ['0', 'false', 'no', 'n', 'off']:
+if os.getenv('RENDER_HTML', '0').lower().strip() in ['0', 'false', 'no', 'n', 'off']:
     # no environment variable, or turned off => regular requests call
     import requests
     def do_get(url, **kwargs):
@@ -103,7 +105,7 @@ else:
         # import what we need, and tell the user what to do if it fails
         from requests_html import HTMLSession  # or something else
     except ModuleNotFoundError:
-        print('Error: RENDER_JS set but requests_html not found.'
+        print('Error: RENDER_HTML set but requests_html not found.'
               'Please, run pip install requests_html')
         exit(1)
 
@@ -276,9 +278,9 @@ After all these troubles, I am now familiar with the requests-html internals. I 
 Moreover, one thing I dislike is the fact that to render a page, I need first to get the html using `requests`. Indeed, the implementation is such that with requests-html, to call render we first need a response, hence to call the `requests.get` method once.
 So crawling one URL means firing at least two `GET`. This detail is what really convinced me to simply reimplement the part I need.
 
-## JsRenderer
+## HtmlRenderer
 
-Basically, what I need to do to render JS is:
+Basically, what I need to do to render HTML (with JS support) is:
 
 1. launch a pyppeteer instance (i.e. a browser)
 2. create a new page (`browser.newPage`)
@@ -308,7 +310,7 @@ if __name__ == '__main__':
 
 Of course, I also want it to be compatible with threads (asyncio), not to hang (recall the `dumpio` thingy), not to launch a browser for each `GET` request, to properly handle exception, etc. Hence, the final code is a bit more complex.
 
-See the `js_renderer` code of the module for the complete example.
+See the `html_renderer` code of the module for the complete example.
 
 ### Threading
 
@@ -335,11 +337,11 @@ This is why I automatically set the viewport to 1200x1000.
 ### Fallback
 
 In some instances the `page.goto` call returns `None` instead of throwing an exception (I posted an [issue](https://github.com/miyakogi/pyppeteer/issues/299) about it). It happens mostly when the content-encoding is wrong, e.g. says `gzip` but the actual content is not a valid gzip.
-In those rare instances, `JsRenderer` will fallback to calling `requests`, which provides meaningful error messages.
+In those rare instances, `HtmlRenderer` will fallback to calling `requests`, which provides meaningful error messages.
 
 ### Requests compatibility
 
-I want to be able to seamlessly switch between requests and JsRenderer. To make that possible, I construct a `requests.Response` for the information I gather from `pyppeteer`.
+I want to be able to seamlessly switch between requests and HtmlRenderer. To make that possible, I construct a `requests.Response` for the information I gather from `pyppeteer`.
 Most `requests.Response` attributes are directly available from the pyppeteer response. Except:
 * `reason`: the reason is the status line, e.g. `OK` for 200. Most websites follow the convention (no status line or the one defined in the RFC), but it can always vary. Requests gets it from `urllib3`. With pyppeteer, I didn't find a way to get it. 
   To not leave it blank, I can: 
@@ -354,11 +356,11 @@ Most `requests.Response` attributes are directly available from the pyppeteer re
 As stated at the beginning of this post, due to how swisstext works, I wanted to control if rendering is used or not at launch without having to change the code of all my crawler implementations.
 
 I already showed how I define a `do_get` method differently based on the value of an environment variable using requests-html.
-Now that I have `JsRenderer` that supports threading, the code is altered in this way:
+Now that I have `HtmlRenderer` that supports threading, the code is altered in this way:
 
 ```python
 
-_ENV_VARIABLE = 'RENDER_JS'
+_ENV_VARIABLE = 'RENDER_HTML'
 
 if os.getenv(_ENV_VARIABLE, '0').lower().strip() in ['0', 'false', 'no', 'n', 'off']:
     logger.info('using REQUESTS for scraping')
@@ -368,7 +370,7 @@ else:
     # let the user choose if one browser is created for all threads
     # or one browser should be created for each thread (_ENV_VARIABLE='2')
     one_browser_per_thread = os.getenv(_ENV_VARIABLE, '0') == '2'
-    logger.info(f'using JS_RENDERER for scraping ({"mono" if one_browser_per_thread else "multi"}-thread)')
+    logger.info(f'using HTML_RENDERER for scraping ({"mono" if one_browser_per_thread else "multi"}-thread)')
 
     # == import modules
 
@@ -384,11 +386,11 @@ else:
     from collections import defaultdict
 
     if one_browser_per_thread:
-        # each thread will create its own JsRenderer instance
-        _RENDERER = defaultdict(lambda: JsRenderer())
+        # each thread will create its own HtmlRenderer instance
+        _RENDERER = defaultdict(lambda: HtmlRenderer())
     else:
-        # create one JsRenderer instance, shared by all threads
-        renderer = JsRenderer()
+        # create one HtmlRenderer instance, shared by all threads
+        renderer = HtmlRenderer()
         _RENDERER = defaultdict(lambda: renderer)
 
     def do_get(url, headers=None, timeout=RENDER_TIMEOUT) -> requests.Response:
@@ -401,11 +403,11 @@ else:
         return resp
 ```
 
-Here, the secret is the use of a `defaultdict`, with the key being the thread name and the value an instance of `JsRenderer`.
+Here, the secret is the use of a `defaultdict`, with the key being the thread name and the value an instance of `HtmlRenderer`.
 
 **If we want one browser only**, we create one renderer when the module is imported. The `__init__.py` method will thus be called from the main thread. This same instance is attached to all the thread names.
 
-**If we want one browser per thread**, we use `defaultdict(lambda: JsRenderer())` so that the first time a thread queries the dictionary, a new renderer instance will be created.
+**If we want one browser per thread**, we use `defaultdict(lambda: HtmlRenderer())` so that the first time a thread queries the dictionary, a new renderer instance will be created.
 
 **If the chromium subprocess dies**... Well, in case the underlying browser is killed for some reason, a `pyppeteer.errors.Network` exception will be thrown in all subsequent calls.
 I can't avoid the first one, but when it happens I could check the subprocess
@@ -438,6 +440,8 @@ So it tried using `pyppeteer2` instead. It seems to work and fixes the websocket
 
 The work of a developer is mostly about generating codes, getting some exception, googling about it and apply the fix that will trigger the next error.
 This is both annoying and exhilarating, a sort of detective work that may not always end as expected.
+
+Another important lesson is that it is never as easy as it seems at first: as a developer, you always end up "getting your hands dirty". In this case, this meant understanding asyncio and pyppeteer.
 
 I know that this blog post will be completely outdated in a few months (the libraries will have changed, as well as the underlying chromium), but I still enjoyed the journey.
 I hope it may be useful to some, fun to read for others.

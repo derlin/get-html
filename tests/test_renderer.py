@@ -1,4 +1,4 @@
-from get_html.js_renderer import JsRenderer
+from get_html.html_renderer import HtmlRenderer
 
 import pytest
 import re
@@ -6,14 +6,14 @@ import re
 
 @pytest.fixture(scope='module')
 def renderer():
-    r = JsRenderer()
+    r = HtmlRenderer()
     try:
         yield r
     finally:
         r.close()
 
 
-def test_response(renderer: JsRenderer):
+def test_response(renderer: HtmlRenderer):
     url = 'http://www.twitter.com'  # this will redirect to https://twitter.com
     r = renderer.render(url)
     assert r.status_code == 200
@@ -22,7 +22,7 @@ def test_response(renderer: JsRenderer):
     assert len(r.history) > 0, 'no redirect ??'
 
 
-def test_404(renderer: JsRenderer):
+def test_404(renderer: HtmlRenderer):
     r = renderer.render('https://github.com/afadfadfaf/adsfa-not-exist')
     assert r.status_code == 404
     assert r.reason == 'Not Found'
@@ -34,13 +34,13 @@ def test_404(renderer: JsRenderer):
         'https://www.investing.com/indices/major-indices',  # has websocket
         # 'http://data.fis-ski.com/dynamic/athlete-biography.html?sector=AL&competitorid=147749&type=result',  # don't remember, but was problematic
     ])
-def test_potentially_problematic_urls(renderer: JsRenderer, url):
+def test_potentially_problematic_urls(renderer: HtmlRenderer, url):
     r = renderer.render(url)
     assert r.status_code == 200
     assert len(r.content) > 0
 
 
-def test_manipulate_page(renderer: JsRenderer):
+def test_manipulate_page(renderer: HtmlRenderer):
     url = 'https://9gag.com/'
     r = renderer.render(url)
     num_articles = len(re.findall('<article', r.text))

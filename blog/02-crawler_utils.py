@@ -5,7 +5,7 @@ import threading
 
 __all__ = ['do_get']
 
-if os.getenv('RENDER_JS', '0').lower().strip() in ['0', 'false', 'no', 'n', 'off']:
+if os.getenv('RENDER_HTML', '0').lower().strip() in ['0', 'false', 'no', 'n', 'off']:
     # no environment variable, or turned off => regular requests call
     import requests
 
@@ -19,7 +19,7 @@ else:
         # import what we need, and tell the user what to do if it fails
         from requests_html import HTMLSession  # or something else
     except ModuleNotFoundError:
-        print('Error: RENDER_JS set but requests_html not found.'
+        print('Error: RENDER_HTML set but requests_html not found.'
               'Please, run pip install requests_html')
         exit(1)
 

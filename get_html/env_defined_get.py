@@ -32,18 +32,18 @@ else:
 
     # == define the actual do_get
 
-    from .js_renderer import JsRenderer
+    from .html_renderer import HtmlRenderer
     from collections import defaultdict
 
     if one_browser_per_thread:
-        # each thread will create its own JsRenderer instance
-        _RENDERER = defaultdict(lambda: JsRenderer())
-        mode = Modes.RENDER_JS_MULTI
+        # each thread will create its own renderer instance
+        _RENDERER = defaultdict(lambda: HtmlRenderer())
+        mode = Modes.RENDER_HTML_MULTI
     else:
-        # create one JsRenderer instance, shared by all threads
-        renderer = JsRenderer()
+        # create one renderer instance, shared by all threads
+        renderer = HtmlRenderer()
         _RENDERER = defaultdict(lambda: renderer)
-        mode = Modes.RENDER_JS_MONO
+        mode = Modes.RENDER_HTML_MONO
 
 
     def do_get(url, headers=None, timeout=RENDER_TIMEOUT) -> requests.Response:
@@ -61,7 +61,7 @@ else:
         Close the browser assigned to the calling thread.
         Note: in case multiple threads use the same browser, nothing will happen.
         """
-        if mode == Modes.RENDER_JS_MONO and len(_RENDERER) > 1:
+        if mode == Modes.RENDER_HTML_MONO and len(_RENDERER) > 1:
             pass
         else:
             _RENDERER[threading.current_thread().name].close()

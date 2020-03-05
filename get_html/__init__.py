@@ -1,2 +1,2 @@
 from ._default import Modes, ENV_VARIABLE
-from .js_renderer import JsRenderer, create_renderer
+from .html_renderer import HtmlRenderer, create_renderer
