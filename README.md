@@ -1,6 +1,6 @@
 # get-html: get raw or rendered HTML (for humans)
 
-**<p align=center>Read all the details on how I implemented this at ⇝
+**<p align=center>Read all the details on how I started implementing this at ⇝
 [Rendering-HTML_a-journey](https://github.com/derlin/get-html/blob/master/blog/Rendering-HTML_a-journey.md) ⇜ </p>**
 
 This module is made for anyone needing to scrape HTML (i.e. scrape the web).
@@ -13,14 +13,13 @@ It knows how to do only one thing, but does it well: getting HTML from a web pag
 Moreover, it is made such that you can use a unique method throughout your project, 
 and switch between the two behaviors at launch by setting an environment variable.
 
-**<p align=center>Read all the details on how I implemented this at ⇝
-[Rendering-HTML_a-journey](https://github.com/derlin/get-html/blob/master/blog/Rendering-HTML_a-journey.md) ⇜ </p>**
-
-## HtmlRenderer: a class to seamlessy render a page
+## HtmlRenderer: a class to seamlessly render a page
 
 `HtmlRenderer` handles all the specific `pyppeteer` stuff for you. It is also thread-safe.
 
-Here is a typical usage:
+### "sync" usage 
+
+Here is a **typical usage**:
 
 ```python
 from get_html import HtmlRenderer
@@ -36,7 +35,7 @@ finally:
     renderer.close()
 ```
 
-Or simply use a context manager:
+Or simply use a **context manager**:
 ```python
 from get_html import create_renderer
 
@@ -46,6 +45,51 @@ with create_renderer() as renderer:
     html = response.text # or resposne.content to get the raw bytes
 
 # here, the underlying browser will be closed
+```
+
+If you need to **manipulate the page** before getting the content, pass an *async* function to `render`.
+It will be called after the page loaded, but before the HTML content is fetched.
+For example:
+```python
+from get_html import create_renderer
+
+async def scroll_to_end(page):
+    # https://github.com/miyakogi/pyppeteer/issues/205#issuecomment-470886682
+    await page.evaluate('{window.scrollBy(0, document.body.scrollHeight);}')
+
+with create_renderer() as renderer: 
+    response = renderer.render('https://9gag.com', manipulate_page_func=scroll_to_end)
+```
+
+### "async" usage 
+
+All public methods have an *async* counterpart. When using *async*, however, you need to ensure that
+
+1. the browser is created once,
+2. the browser is closed once.
+ 
+By default, the browser is launched upon first use, usually on the first call of `render`. 
+When using *async*, this may be a problem, as multiple coroutine will try to create the browser multiple times.
+To avoid this, ensure you trigger the browser creation *before* launching the other tasks (same for closing, wait for all tasks to complete).
+
+A concrete example is available in
+[examples/async_example.py](https://github.com/derlin/blob/master/examples/async_example.py). Here is the gist:
+
+```python
+import asyncio
+from get_html import HtmlRenderer
+
+loop = asyncio.get_event_loop()
+renderer = HtmlRenderer()
+
+# trigger the browser creation only once, before the tasks
+loop.run_until_complete(renderer.async_browser)
+
+# .. TASKS WITH RENDERING CALLS ... 
+#    e.g. loop.run_until_complete(someRenderingTask())
+
+# finally close the browser once the tasks completed
+loop.run_until_complete(renderer.async_close())
 ```
 
 ## do_get: seemlessly switch between behaviors

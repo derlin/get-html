@@ -49,8 +49,9 @@ class HtmlRenderer:
         self.__lock = threading.Lock()
 
     @property
-    async def _async_browser(self):
+    async def async_browser(self):
         if self.__browser is None:
+            logger.debug('launching browser')
             self.__browser = await pyppeteer.launch(
                 # avoid exception "signal only works in main thread"
                 # see https://stackoverflow.com/a/54030151
@@ -68,10 +69,11 @@ class HtmlRenderer:
     @property
     def browser(self):
         if not hasattr(self, "_browser"):
-            self.__browser = self.loop.run_until_complete(self._async_browser)
+            self.__browser = self.loop.run_until_complete(self.async_browser)
         return self.__browser
 
-    async def async_render(self, url, timeout=RENDER_TIMEOUT, wait_until='networkidle0', manipulate_page_func=None, **kwargs):
+    async def async_render(self, url, timeout=RENDER_TIMEOUT, wait_until='networkidle0', manipulate_page_func=None,
+                           **kwargs):
         """
         Render a URL in a browser, then get the rendered HTML after JS DOM manipulation.
         :param url: the URL to render
@@ -85,8 +87,10 @@ class HtmlRenderer:
         the usual `Response`, except `cookies` which will always be `None`.
         """
         page, browser = None, None
+        logger.debug(f'{url}: starting async render')
+
         try:
-            browser = await self._async_browser
+            browser = await self.async_browser
             start = datetime.datetime.now()
             page = await browser.newPage()
             # Make the page a bit bigger (height especially useful for sites like twitter)
@@ -101,18 +105,20 @@ class HtmlRenderer:
 
             if response is None:
                 # shouldn't happen, but ... see https://github.com/miyakogi/pyppeteer/issues/299
+                logger.warning(f'{url}: response is None !')
                 return None
 
             if manipulate_page_func is not None:
                 await manipulate_page_func(page)
-                await asyncio.sleep(0.2) # ensure the changes have time to be "applied" (e.g. scroll)
+                await asyncio.sleep(0.2)  # ensure the changes have time to be "applied" (e.g. scroll)
 
             # Return the content of the page, JavaScript evaluated.
             content = await page.content()
+            logger.debug(f'{url}: status={response.status}')
             return self._create_response(response, content, datetime.datetime.now() - start)
 
         except pyppeteer.errors.TimeoutError:
-            logger.info(f'{url}: timeout error (final).')
+            logger.warning(f'{url}: timeout error (final).')
             return None
         except pyppeteer.errors.NetworkError as e:
             if browser and browser.process.poll() is not None:
@@ -132,8 +138,7 @@ class HtmlRenderer:
         :param kwargs: see `async_render`
         :return: a `requests.Response`, with the content reflecting the HTML after the rendering.
         """
-        try:
-            self.__lock.acquire()
+        with self.__lock:
             response = self.loop.run_until_complete(self.async_render(url=url, **kwargs))
             if response is None:
                 # May happen on incorrect gzip encoding ... see https://github.com/miyakogi/pyppeteer/issues/299
@@ -143,8 +148,6 @@ class HtmlRenderer:
                 #     error('Error -3 while decompressing data: incorrect header check'))
                 return default_get(url, headers=None, timeout=kwargs.get('timeout', GET_TIMEOUT))
             return response
-        finally:
-            self.__lock.release()
 
     def _create_response(self, response, content, elapsed=None, with_history=True):
         # Create requests.Response and try to make the fields match what you would expect when using
@@ -157,7 +160,7 @@ class HtmlRenderer:
         resp.headers.update(response.headers)
         # status
         resp.status_code = response.status
-        resp.reason = http_client_responses[response.status] #requests.status_codes._codes[resp.status_code][0]
+        resp.reason = http_client_responses[response.status]  # requests.status_codes._codes[resp.status_code][0]
         # history
         if with_history:
             resp.history = [
@@ -169,6 +172,7 @@ class HtmlRenderer:
 
     async def async_close(self):
         if self.__browser is not None:
+            logger.debug('closing browser')
             await self.__browser.close()
         self.__browser = None
 
@@ -177,8 +181,5 @@ class HtmlRenderer:
         Close the browser instance, if any.
         :return:
         """
-        try:
-            self.__lock.acquire()
+        with self.__lock:
             self.loop.run_until_complete(self.async_close())
-        finally:
-            self.__lock.release()
