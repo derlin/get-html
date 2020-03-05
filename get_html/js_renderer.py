@@ -71,13 +71,15 @@ class JsRenderer:
             self.__browser = self.loop.run_until_complete(self._async_browser)
         return self.__browser
 
-    async def async_render(self, url, timeout=RENDER_TIMEOUT, wait_until='networkidle0', **kwargs):
+    async def async_render(self, url, timeout=RENDER_TIMEOUT, wait_until='networkidle0', manipulate_page_func=None, **kwargs):
         """
         Render a URL in a browser, then get the rendered HTML after JS DOM manipulation.
         :param url: the URL to render
         :param timeout: maximum time, in seconds, before giving up
         :param wait_until: see
         [`puppeteer.Page.goto`'s waitUntil](https://pptr.dev/#?product=Puppeteer&version=v2.1.1&show=api-pagegotourl-options)
+        :param manipulate_page_func: an async function taking page as a parameter,
+         if you need to do something such as scroll or evaluate a custom JS before getting content.
         :param kwargs: additional arguments passed to pyppeteer's Page.goto method
         :return: a `requests.Response`, with `content` set to the rendered raw HTML. The other fields should match
         the usual `Response`, except `cookies` which will always be `None`.
@@ -100,6 +102,10 @@ class JsRenderer:
             if response is None:
                 # shouldn't happen, but ... see https://github.com/miyakogi/pyppeteer/issues/299
                 return None
+
+            if manipulate_page_func is not None:
+                await manipulate_page_func(page)
+                await asyncio.sleep(0.2) # ensure the changes have time to be "applied" (e.g. scroll)
 
             # Return the content of the page, JavaScript evaluated.
             content = await page.content()

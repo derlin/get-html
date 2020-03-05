@@ -1,6 +1,7 @@
 from get_html.js_renderer import JsRenderer
 
 import pytest
+import re
 
 
 @pytest.fixture(scope='module')
@@ -37,3 +38,23 @@ def test_potentially_problematic_urls(renderer: JsRenderer, url):
     r = renderer.render(url)
     assert r.status_code == 200
     assert len(r.content) > 0
+
+
+def test_manipulate_page(renderer: JsRenderer):
+    url = 'https://9gag.com/'
+    r = renderer.render(url)
+    num_articles = len(re.findall('<article', r.text))
+
+    # async def fn(page):
+    #     assert page is not None
+    #     for _ in range(10):
+    #         await page._keyboard.down('PageDown')
+
+    async def fn(page):
+        # https://github.com/miyakogi/pyppeteer/issues/205#issuecomment-470886682
+        await page.evaluate('{window.scrollBy(0, document.body.scrollHeight);}')
+
+    r = renderer.render(url, manipulate_page_func=fn)
+    num_articles_after_scroll = len(re.findall('<article', r.text))
+    print(num_articles, num_articles_after_scroll)
+    assert num_articles_after_scroll > num_articles
