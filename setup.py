@@ -8,7 +8,7 @@ with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'README.md'),
 
 setuptools.setup(
     name='get-html',
-    version='0.0.2',
+    version='0.0.3',
     author='Lucy Linder',
     author_email='lucy.derlin@gmail.com',
     description='HTTP GET with JS rendering support, to get the rendered HTML from a page easily',
