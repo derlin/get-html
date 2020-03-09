@@ -2,7 +2,7 @@
 
 This article is an account of my development process that took place in **February 2020** (Python 3) and ended to the library in this repo.
 
-It was a sort of detective work, going from libraries to exceptions until I had learned enough (and waisted enough time) to write the code that does exactly what I need in the proper fashion. Hope you will enjoy the journey as well.
+It was a sort of detective work, going from libraries to exceptions until I had learned enough (and wasted enough time) to write the code that does exactly what I need in the proper fashion. Hope you will enjoy the journey as well.
 
 **Libraries used in this article**
 
