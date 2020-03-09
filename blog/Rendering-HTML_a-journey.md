@@ -1,15 +1,8 @@
 # Rendering HTML: a journey
 
-This article is an account of my development process that took place in **February 2020** (Python 3).
+This article is an account of my development process that took place in **February 2020** (Python 3) and ended to the library in this repo.
 
-I first explain my first attempt (using a third-party library, requests-html) at fetching the HTML from an URL *after* JS rendering, the problems I struggled with and the incremental solutions I found.
-I then explain why I decided to make my own library instead, and how I solved the problems.
-
-**Disclaimer**:
-
-It started as a bunch of personal notes, but I figured it would be interesting for others.
-I wouldn't in any way want to pretend that other libraries are "*bad*" or that reimplementing the wheel is always a good idea.
-This was really more of an exercise to me, so please keep an open (and critical) mind while reading.
+It was a sort of detective work, going from libraries to exceptions until I had learned enough (and waisted enough time) to write the code that does exactly what I need in the proper fashion. Hope you will enjoy the journey as well.
 
 **Libraries used in this article**
 
